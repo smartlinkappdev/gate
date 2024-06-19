@@ -12,3 +12,7 @@ recreate:
 
 migrate:
 	go run cmd/gate/migrate.go
+
+
+gen:
+	go run cmd/gate/m.go

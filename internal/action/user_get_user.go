@@ -8,7 +8,7 @@ import (
 	"cmd/gate/main.go/internal/jsonrpc"
 )
 
-func UserGetInfo(options jsonrpc.Options) (json.RawMessage, error) {
+func UserGetUser(options jsonrpc.Options) (json.RawMessage, error) {
 	user := entity.User{}
 	options.Conn.Model(&user).Where("id = ?", options.UserID).First(&user)
 

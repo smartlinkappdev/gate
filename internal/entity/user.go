@@ -1,15 +1,18 @@
 package entity
 
-import "time"
+import (
+	"gorm.io/gorm"
+	"time"
+)
 
 type User struct {
-	ID        int        `gorm:"primary_key" json:"id"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	DeletedAt *time.Time `sql:"index" json:"deleted_at"`
-	FirstName string     `json:"first_name"`
-	LastName  string     `json:"last_name"`
-	Username  string     `json:"username"`
-	Email     string     `json:"email"`
-	Role      string     `json:"role"`
+	ID        int `gorm:"primaryKey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt `gorm:"index"`
+	FirstName string         `json:"first_name"`
+	LastName  string         `json:"last_name"`
+	Email     string         `json:"email"`
+	Role      string         `json:"role"`
+	Groups    []*Group       `json:"groups" gorm:"many2many:user_groups;"`
 }

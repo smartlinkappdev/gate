@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"github.com/go-chi/chi/v5/middleware"
 	"io"
 	"log/slog"
 	"net/http"
@@ -25,6 +26,7 @@ type App struct {
 
 	methods map[string]jsonrpc.Method
 	conn    *gorm.DB
+	conn2   *gorm.DB
 
 	auth auth.InterfaceAuth
 }
@@ -49,6 +51,12 @@ func (app *App) Init(config *config.Config) {
 	}
 	app.conn = conn
 
+	conn2, err := gorm.Open(postgres.Open("host=45.9.27.162 user=root password=LfhTG7T7dzwmkXh dbname=sldb_ym port=5432"), &gorm.Config{})
+	if err != nil {
+		panic(err)
+	}
+	app.conn2 = conn2
+
 	app.auth = auth.New()
 	err = app.auth.Init(config.Auth.DSN)
 	if err != nil {
@@ -56,8 +64,15 @@ func (app *App) Init(config *config.Config) {
 		panic(err)
 	}
 
-	app.methods["user.get.info"] = action.UserGetInfo
+	app.methods["user.get.user"] = action.UserGetUser
 	app.methods["user.get.users"] = action.UserGetUsers
+
+	app.methods["group.create.group"] = action.GroupCreateGroup
+	app.methods["group.get.groups"] = action.GroupGetGroups
+	app.methods["group.join.group"] = action.GroupJoinGroup
+	app.methods["group.leave.group"] = action.GroupLeaveGroup
+
+	app.methods["metric.get.metric"] = action.MetricGetMetric
 }
 
 func (app *App) Start() {
@@ -70,6 +85,8 @@ func (app *App) Start() {
 
 func (app *App) initRouter() {
 	router := chi.NewRouter()
+	router.Use(middleware.SetHeader("Access-Control-Allow-Origin", "*"))
+	router.Use(middleware.SetHeader("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization"))
 
 	// auth
 	router.Post("/login", app.login)
@@ -86,12 +103,22 @@ func (app *App) initRouter() {
 
 func (app *App) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		type Response struct {
+			Auth  bool  `json:"auth"`
+			Error error `json:"error"`
+		}
+
+		response := Response{Auth: false, Error: nil}
+
 		body, err := io.ReadAll(r.Body)
 		defer func() {
 			err = r.Body.Close()
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write([]byte(err.Error()))
+				response.Auth = false
+				response.Error = err
+				res, _ := json.Marshal(response)
+				_, _ = w.Write(res)
 				return
 			}
 		}()
@@ -100,14 +127,20 @@ func (app *App) authMiddleware(next http.Handler) http.Handler {
 		err = json.Unmarshal(body, &request)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte(err.Error()))
+			response.Auth = false
+			response.Error = err
+			res, _ := json.Marshal(response)
+			_, _ = w.Write(res)
 			return
 		}
 
 		claims, err := app.auth.VerifyToken(request.Token)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte(err.Error()))
+			response.Auth = false
+			response.Error = err
+			res, _ := json.Marshal(response)
+			_, _ = w.Write(res)
 			return
 		}
 
@@ -127,8 +160,13 @@ func (app *App) login(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	type LoginRequest struct {
-		Username string `json:"username"`
+		Email    string `json:"email"`
 		Password string `json:"password"`
+	}
+
+	type LoginResponse struct {
+		Token string       `json:"token"`
+		User  *entity.User `json:"user"`
 	}
 
 	lr := LoginRequest{}
@@ -140,7 +178,7 @@ func (app *App) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := app.auth.Login(lr.Username, lr.Password)
+	token, err := app.auth.Login(lr.Email, lr.Password)
 	if err != nil {
 		app.log.Error("request", "error", err)
 		w.WriteHeader(http.StatusBadRequest)
@@ -168,7 +206,6 @@ func (app *App) signup(w http.ResponseWriter, r *http.Request) {
 		FirstName string `json:"first_name"`
 		LastName  string `json:"last_name"`
 		Email     string `json:"email"`
-		Username  string `json:"username"`
 		Password  string `json:"password"`
 	}
 
@@ -181,7 +218,7 @@ func (app *App) signup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, id, err := app.auth.Signup(sr.Username, sr.Password)
+	token, id, err := app.auth.Signup(sr.Email, sr.Password)
 	if err != nil {
 		app.log.Error("request", "error", err)
 		w.WriteHeader(http.StatusBadRequest)
@@ -193,7 +230,6 @@ func (app *App) signup(w http.ResponseWriter, r *http.Request) {
 		ID:        id,
 		FirstName: sr.FirstName,
 		LastName:  sr.LastName,
-		Username:  sr.Username,
 		Email:     sr.Email,
 		Role:      "USER",
 	}
@@ -228,7 +264,9 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 	id := r.Context().Value("id").(int)
 
 	options := jsonrpc.Options{
+		Log:    app.log,
 		Conn:   app.conn,
+		Conn2:  app.conn2,
 		UserID: id,
 	}
 

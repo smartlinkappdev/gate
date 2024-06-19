@@ -9,7 +9,6 @@ type User struct {
 	DeletedAt time.Time `json:"deleted_at"`
 	FirstName string    `json:"first_name"`
 	LastName  string    `json:"last_name"`
-	Username  string    `json:"username"`
 	Email     string    `json:"email"`
 	Role      string    `json:"role"`
 }

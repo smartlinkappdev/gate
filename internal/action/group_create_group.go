@@ -19,22 +19,17 @@ func GroupCreateGroup(options jsonrpc.Options) (json.RawMessage, error) {
 		return nil, err
 	}
 
+	user := entity.User{}
+	options.Conn.Find(&user, "id = ?", options.UserID)
+
 	group := entity.Group{
 		Name:        params.Name,
 		OwnerID:     options.UserID,
 		Description: params.Description,
 	}
 
-	user := entity.User{}
-	options.Conn.Find(&user, "id = ?", options.UserID)
-
 	group.Users = append(group.Users, &user)
 	options.Conn.Create(&group)
 
-	result, err := json.Marshal(&group)
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
+	return json.Marshal(&group)
 }

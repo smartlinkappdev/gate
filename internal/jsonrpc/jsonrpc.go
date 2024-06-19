@@ -2,6 +2,7 @@ package jsonrpc
 
 import (
 	"encoding/json"
+	"log/slog"
 
 	"gorm.io/gorm"
 )
@@ -19,7 +20,9 @@ type Response struct {
 }
 
 type Options struct {
+	Log    *slog.Logger
 	Conn   *gorm.DB
+	Conn2  *gorm.DB
 	UserID int
 	Params json.RawMessage
 }

@@ -6,6 +6,6 @@ type InterfaceAuth interface {
 	CreateToken(claims *Claims) (string, error)
 	VerifyToken(token string) (*Claims, error)
 
-	Signup(username, password string) (string, int, error)
-	Login(username, password string) (string, error)
+	Signup(email, password string) (string, int, error)
+	Login(email, password string) (string, error)
 }

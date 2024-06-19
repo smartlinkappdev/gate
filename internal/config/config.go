@@ -1,6 +1,10 @@
 package config
 
-import "os"
+import (
+	"github.com/joho/godotenv"
+	"log"
+	"os"
+)
 
 type Config struct {
 	Env     string
@@ -18,6 +22,10 @@ type Auth struct {
 }
 
 func New() *Config {
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found")
+	}
+
 	return &Config{
 		Env:  os.Getenv("ENV"),
 		Port: os.Getenv("PORT"),

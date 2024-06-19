@@ -8,11 +8,31 @@ import (
 	"cmd/gate/main.go/internal/jsonrpc"
 )
 
+type UsersGetUsersParams struct {
+	Email string
+}
+
 func UserGetUsers(options jsonrpc.Options) (json.RawMessage, error) {
+	params := UsersGetUsersParams{}
+	err := json.Unmarshal(options.Params, &params)
+	if err != nil {
+		return nil, err
+	}
+
 	var users []entity.User
+
+	if params.Email != "" {
+		options.Conn.Where("email ILIKE ?", fmt.Sprintf("%%%s%%", params.Email)).Find(&users)
+		result, err := json.Marshal(users)
+		if err != nil {
+			return nil, err
+		}
+
+		return result, nil
+	}
+
 	options.Conn.Find(&users)
 
-	fmt.Println("USERS:", users)
 	result, err := json.Marshal(users)
 	if err != nil {
 		return nil, err

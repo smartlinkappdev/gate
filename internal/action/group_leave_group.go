@@ -6,21 +6,20 @@ import (
 	"encoding/json"
 )
 
-type GroupLeftGroupParams struct {
+type GroupLeaveGroupParams struct {
 	ID int `json:"id"`
 }
 
-func GroupLeftGroup(options jsonrpc.Options) (json.RawMessage, error) {
+func GroupLeaveGroup(options jsonrpc.Options) (json.RawMessage, error) {
 	group := entity.Group{}
 
-	params := GroupJoinGroupParams{}
+	params := GroupLeaveGroupParams{}
 	err := json.Unmarshal(options.Params, &params)
 	if err != nil {
 		return nil, err
 	}
 
 	options.Conn.Model(&group).Where("id = ?", params.ID).Find(&group)
-
 	err = options.Conn.Model(&group).Association("Users").Delete(&entity.User{ID: options.UserID})
-	return nil, err
+	return nil, nil
 }

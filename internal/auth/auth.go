@@ -34,9 +34,9 @@ var mySigningKey = []byte("secret")
 // CreateToken создает JWT
 func (a *Auth) CreateToken(claims *Claims) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"username": claims.Username,
-		"id":       claims.ID,
-		"exp":      time.Now().Add(time.Hour * 24).Unix(), // Токен, действительный сутки
+		"email": claims.Email,
+		"id":    claims.ID,
+		"exp":   time.Now().Add(time.Hour * 24).Unix(), // Токен, действительный сутки
 	})
 	return token.SignedString(mySigningKey)
 }
@@ -55,8 +55,8 @@ func (a *Auth) VerifyToken(tokenString string) (*Claims, error) {
 		fmt.Println(claims)
 
 		c := Claims{
-			Username: claims["username"].(string),
-			ID:       int(claims["id"].(float64)),
+			Email: claims["email"].(string),
+			ID:    int(claims["id"].(float64)),
 		}
 
 		fmt.Println(c)
@@ -66,7 +66,7 @@ func (a *Auth) VerifyToken(tokenString string) (*Claims, error) {
 	}
 }
 
-func (a *Auth) Signup(username, password string) (string, int, error) {
+func (a *Auth) Signup(email, password string) (string, int, error) {
 	salt, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to generate salt: %v", err)
@@ -80,16 +80,16 @@ func (a *Auth) Signup(username, password string) (string, int, error) {
 
 	// Создание пользователя с хэшированным паролем и солью
 	user := UserAuth{
-		Hash:     string(hashedPassword),
-		Salt:     string(salt),
-		Username: username,
+		Hash:  string(hashedPassword),
+		Salt:  string(salt),
+		Email: email,
 	}
 
 	a.conn.Create(&user)
 
 	token, err := a.CreateToken(&Claims{
-		ID:       user.ID,
-		Username: username,
+		ID:    user.ID,
+		Email: email,
 	})
 	if err != nil {
 		return "", 0, err
@@ -97,9 +97,9 @@ func (a *Auth) Signup(username, password string) (string, int, error) {
 
 	return token, user.ID, err
 }
-func (a *Auth) Login(username, password string) (string, error) {
+func (a *Auth) Login(email, password string) (string, error) {
 	user := UserAuth{}
-	a.conn.Model(&UserAuth{}).Where("username = ?", username).Find(&user)
+	a.conn.Model(&UserAuth{}).Where("email = ?", email).Find(&user)
 	err := bcrypt.CompareHashAndPassword([]byte(user.Hash), []byte(password))
 	if err != nil {
 		return "", err
@@ -108,7 +108,7 @@ func (a *Auth) Login(username, password string) (string, error) {
 	fmt.Println(user)
 
 	return a.CreateToken(&Claims{
-		ID:       user.ID,
-		Username: username,
+		ID:    user.ID,
+		Email: email,
 	})
 }
