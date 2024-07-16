@@ -1,0 +1,54 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22'
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~./go/pkg/mod
+          ~./go/cache
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Install Go dependencies
+      run: go mod download
+
+    - name: Build Go binary
+      run: |
+        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o main cmd/gate/main.go  # Убедитесь, что путь к вашему файлу main.go правильный
+
+    - name: Build Docker image
+      run: |
+        docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/gate:latest .
+      
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: akaletr
+        password: adelaida2011
+
+    - name: Push Docker image
+      run: |
+        docker push akaletr/gate:latest
+
+    - name: Clean up Docker images
+      run: |
+        docker system prune -af
