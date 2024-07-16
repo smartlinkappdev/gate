@@ -21,7 +21,7 @@ FROM scratch
 
 # Copy the binary from the builder stage
 COPY --from=builder /main /main
-COPY --from=builder /.env /.env
+COPY --from=builder /app/.env /.env
 
 # Command to run the executable
 ENTRYPOINT ["/main"]
