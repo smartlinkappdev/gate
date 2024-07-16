@@ -22,7 +22,7 @@ func UserGetUsers(options jsonrpc.Options) (json.RawMessage, error) {
 	var users []entity.User
 
 	if params.Email != "" {
-		options.Conn.Where("email ILIKE ?", fmt.Sprintf("%%%s%%", params.Email)).Find(&users)
+		options.Conn.Where("email ILIKE ?", fmt.Sprintf("%%%s%%", params.Email)).Order("id DESC").Find(&users)
 		result, err := json.Marshal(users)
 		if err != nil {
 			return nil, err
@@ -31,7 +31,7 @@ func UserGetUsers(options jsonrpc.Options) (json.RawMessage, error) {
 		return result, nil
 	}
 
-	options.Conn.Find(&users)
+	options.Conn.Order("id ASC").Find(&users)
 
 	result, err := json.Marshal(users)
 	if err != nil {

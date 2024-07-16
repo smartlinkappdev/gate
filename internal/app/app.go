@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"encoding/json"
-	"github.com/go-chi/chi/v5/middleware"
 	"io"
 	"log/slog"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 	"cmd/gate/main.go/internal/jsonrpc"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -64,15 +64,21 @@ func (app *App) Init(config *config.Config) {
 		panic(err)
 	}
 
+	app.methods["bio.get.bio"] = action.BioGetBio
+
 	app.methods["user.get.user"] = action.UserGetUser
 	app.methods["user.get.users"] = action.UserGetUsers
 
 	app.methods["group.create.group"] = action.GroupCreateGroup
+	app.methods["group.get.group"] = action.GroupGetGroup
 	app.methods["group.get.groups"] = action.GroupGetGroups
 	app.methods["group.join.group"] = action.GroupJoinGroup
 	app.methods["group.leave.group"] = action.GroupLeaveGroup
 
 	app.methods["metric.get.metric"] = action.MetricGetMetric
+
+	app.methods["link.create.link"] = action.LinkCreateLink
+	app.methods["link.get.links"] = action.LinkGetLinks
 }
 
 func (app *App) Start() {

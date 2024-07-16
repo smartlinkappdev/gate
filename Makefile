@@ -5,6 +5,8 @@ run:
 	go run cmd/gate/main.go
 
 recreate:
+	#docker buildx build --platform linux/amd64 -t gate .
+	#docker buildx build --platform linux/amd64 -t gate .
 	docker build -t gate .
 	docker tag gate akaletr/gate:latest
 	docker push akaletr/gate:latest

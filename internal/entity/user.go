@@ -6,7 +6,7 @@ import (
 )
 
 type User struct {
-	ID        int `gorm:"primaryKey"`
+	ID        int `gorm:"primaryKey" json:"id"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`
@@ -15,4 +15,5 @@ type User struct {
 	Email     string         `json:"email"`
 	Role      string         `json:"role"`
 	Groups    []*Group       `json:"groups" gorm:"many2many:user_groups;"`
+	Links     []*Link        `json:"links" gorm:"many2many:user_link;"`
 }

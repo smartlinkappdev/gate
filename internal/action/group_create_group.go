@@ -10,6 +10,8 @@ import (
 type GroupCreateGroupParams struct {
 	Name        string `form:"name"`
 	Description string `form:"description"`
+	Users       []int  `form:"users"`
+	Links       []int  `form:"links"`
 }
 
 func GroupCreateGroup(options jsonrpc.Options) (json.RawMessage, error) {
@@ -28,7 +30,16 @@ func GroupCreateGroup(options jsonrpc.Options) (json.RawMessage, error) {
 		Description: params.Description,
 	}
 
+	for _, uID := range params.Users {
+		group.Users = append(group.Users, &entity.User{ID: uID})
+	}
+
+	for _, lID := range params.Links {
+		group.Links = append(group.Links, &entity.Link{ID: lID})
+	}
+
 	group.Users = append(group.Users, &user)
+
 	options.Conn.Create(&group)
 
 	return json.Marshal(&group)

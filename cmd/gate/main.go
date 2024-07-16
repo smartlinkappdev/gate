@@ -21,6 +21,7 @@ func main() {
 	cfg := config.New()
 
 	// установка логгера
+
 	log := setupLogger(cfg.Env)
 	log.Info("starting gate")
 

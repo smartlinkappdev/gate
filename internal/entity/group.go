@@ -15,4 +15,5 @@ type Group struct {
 	Owner       *User          `gorm:"foreignKey:OwnerID"`
 	Description string         `json:"description"`
 	Users       []*User        `gorm:"many2many:user_groups;" json:"users"`
+	Links       []*Link        `gorm:"many2many:group_link;" json:"links"`
 }

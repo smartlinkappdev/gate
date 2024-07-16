@@ -1,11 +1,14 @@
 package action
 
 import (
-	"cmd/gate/main.go/internal/jsonrpc"
-	"cmd/gate/main.go/internal/ym/model"
+	"cmd/gate/main.go/internal/entity"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
+
+	"cmd/gate/main.go/internal/jsonrpc"
+	"cmd/gate/main.go/internal/ym/model"
 )
 
 type MetricGetMetricParams struct {
@@ -27,24 +30,64 @@ func MetricGetMetric(options jsonrpc.Options) (json.RawMessage, error) {
 	fmt.Println("PARAMS", params)
 
 	m := model.YmDatum{}
-	//res := make([]model.YmDatum, 5)
-	//options.Conn2.Model(&m).Limit(5).Find(&res)
 
 	type Result struct {
-		Date    string
-		UrlPath string `gorm:"url_path"`
-		Total   int
+		Date      string
+		Dimension string
+		Total     int
 	}
 
 	r := make([]Result, 0)
-	err = options.Conn2.Model(&m).Select("EXTRACT(EPOCH FROM timestamp) as date, url_path, sum(users) as total").Group("EXTRACT(EPOCH FROM timestamp), url_path").Where("url_path = ?", "sms/mbp").Where("timestamp BETWEEN ? AND ?", "2024-05-25", "2024-05-27").Find(&r).Error
+
+	dateString := "DATE(timestamp)"
+	if params.Interval == "hour" {
+		dateString = "EXTRACT(EPOCH FROM timestamp)"
+	}
+
+	paths := make([]string, 0)
+	options.Conn.Model(entity.User{ID: options.UserID}).Select("name").Association("Links").Find(&paths)
+
+	queryParams := make([]string, 0)
+	queryParams = append(queryParams, fmt.Sprintf("%s as date", dateString), fmt.Sprintf("%s as dimension", params.Dimension), "sum(users) as total")
+
+	err = options.Conn2.Model(&m).
+		Select(queryParams).
+		Group(fmt.Sprintf("%s, dimension", dateString)).
+		Where("url_path IN ?", paths).
+		Where("timestamp BETWEEN ? AND ?", params.Range[0], params.Range[1]).
+		Find(&r).Error
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	//fmt.Println("METRIC:", res)
-	//fmt.Println("METRIC_66666:", r)
-	result, err := json.Marshal(r)
+	d := make(map[string]map[int]int)
+
+	// Заполнение вложенной карты
+	for _, result := range r {
+		if d[result.Dimension] == nil {
+			d[result.Dimension] = make(map[int]int)
+		}
+
+		var t int
+		if params.Interval == "day" {
+			tt, err := time.Parse(time.RFC3339, result.Date)
+			if err != nil {
+				fmt.Println("Error parsing date:", err)
+			}
+
+			// Получение количества секунд с начала эпохи (UNIX timestamp)
+			t = int(tt.Unix())
+		} else {
+			t, err = strconv.Atoi(result.Date[0:10])
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+
+		d[result.Dimension][t*1000] = result.Total
+	}
+
+	result, err := json.Marshal(d)
 	if err != nil {
 		return nil, err
 	}
