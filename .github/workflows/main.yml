@@ -37,7 +37,7 @@ jobs:
 
     - name: Build Docker image
       run: |
-        docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/gate:latest .
+        docker build -t akaletr/gate:latest .
       
     - name: Log in to Docker Hub
       uses: docker/login-action@v2
