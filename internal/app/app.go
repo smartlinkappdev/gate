@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -76,6 +77,7 @@ func (app *App) Init(config *config.Config) {
 	app.methods["group.leave.group"] = action.GroupLeaveGroup
 
 	app.methods["metric.get.metric"] = action.MetricGetMetric
+	app.methods["metric.get.chart"] = action.MetricGetChart
 
 	app.methods["link.create.link"] = action.LinkCreateLink
 	app.methods["link.get.links"] = action.LinkGetLinks
@@ -93,15 +95,20 @@ func (app *App) initRouter() {
 	router := chi.NewRouter()
 	router.Use(middleware.SetHeader("Access-Control-Allow-Origin", "*"))
 	router.Use(middleware.SetHeader("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization"))
-
+	router.Use(middleware.SetHeader("Access-Control-Allow-Methods", " GET, PUT, POST, DELETE, OPTIONS"))
 	// auth
 	router.Post("/login", app.login)
 	router.Post("/signup", app.signup)
 
 	// api
 	router.Route("/v1", func(r chi.Router) {
+		r.Use(middleware.SetHeader("Access-Control-Allow-Methods", " GET, PUT, POST, DELETE, OPTIONS"))
 		r.Use(app.authMiddleware)
 		r.Post("/", app.handleRequest)
+		r.Options("/", func(w http.ResponseWriter, r *http.Request) {
+			fmt.Println("OPTIONS")
+			w.WriteHeader(http.StatusOK)
+		})
 	})
 
 	app.srv.Handler = router
@@ -109,6 +116,11 @@ func (app *App) initRouter() {
 
 func (app *App) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		type Response struct {
 			Auth  bool  `json:"auth"`
 			Error error `json:"error"`

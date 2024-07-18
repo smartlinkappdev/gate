@@ -36,7 +36,7 @@ func (a *Auth) CreateToken(claims *Claims) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"email": claims.Email,
 		"id":    claims.ID,
-		"exp":   time.Now().Add(time.Hour * 24).Unix(), // Токен, действительный сутки
+		"exp":   time.Now().Add(time.Hour * 1000).Unix(), // Токен, действительный сутки
 	})
 	return token.SignedString(mySigningKey)
 }

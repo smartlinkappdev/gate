@@ -61,7 +61,6 @@ func MetricGetMetric(options jsonrpc.Options) (json.RawMessage, error) {
 	}
 
 	d := make(map[string]map[int]int)
-
 	// Заполнение вложенной карты
 	for _, result := range r {
 		if d[result.Dimension] == nil {
