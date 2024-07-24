@@ -1,11 +1,11 @@
 package action
 
 import (
-	"cmd/gate/main.go/internal/entity"
 	"cmd/gate/main.go/internal/jsonrpc"
 	"cmd/gate/main.go/internal/ym/model"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -36,9 +36,20 @@ type MetricGetChartParams struct {
 			In    []string `json:"in"`
 			NotIn []string `json:"notIn"`
 		} `json:"operating_system"`
+		UTMSource struct {
+			In    []string `json:"in"`
+			NotIn []string `json:"notIn"`
+		} `json:"utm_source"`
+		UTMMedium struct {
+			In    []string `json:"in"`
+			NotIn []string `json:"notIn"`
+		} `json:"utm_medium"`
+		UTMCampaign struct {
+			In    []string `json:"in"`
+			NotIn []string `json:"notIn"`
+		} `json:"utm_campaign"`
 	} `json:"filter"`
-	Limit int  `json:"limit"`
-	Total bool `json:"needtotal"`
+	Limit int `json:"limit"`
 }
 
 func MetricGetChart(options jsonrpc.Options) (json.RawMessage, error) {
@@ -66,8 +77,8 @@ func MetricGetChart(options jsonrpc.Options) (json.RawMessage, error) {
 		dateString = "EXTRACT(EPOCH FROM timestamp)"
 	}
 
-	paths := make([]string, 0)
-	options.Conn.Model(entity.User{ID: options.UserID}).Select("name").Association("Links").Find(&paths)
+	//paths := make([]string, 0)
+	//options.Conn.Model(entity.User{ID: options.UserID}).Select("name").Association("Links").Find(&paths)
 
 	queryParams := make([]string, 0)
 	queryParams = append(queryParams, fmt.Sprintf("%s as date", dateString), fmt.Sprintf("%s as dimension", params.Dimension), fmt.Sprintf("sum(%s) as total", params.Metric))
@@ -103,6 +114,27 @@ func MetricGetChart(options jsonrpc.Options) (json.RawMessage, error) {
 		query = query.Not("device IN ?", params.Filter.Device.NotIn)
 	}
 
+	if len(params.Filter.UTMSource.In) > 0 {
+		query = query.Where("utm_source IN ?", params.Filter.UTMSource.In)
+	}
+	if len(params.Filter.UTMSource.NotIn) > 0 {
+		query = query.Not("utm_source IN ?", params.Filter.UTMSource.NotIn)
+	}
+
+	if len(params.Filter.UTMMedium.In) > 0 {
+		query = query.Where("utm_medium IN ?", params.Filter.UTMMedium.In)
+	}
+	if len(params.Filter.UTMMedium.NotIn) > 0 {
+		query = query.Not("utm_medium IN ?", params.Filter.UTMMedium.NotIn)
+	}
+
+	if len(params.Filter.UTMCampaign.In) > 0 {
+		query = query.Where("utm_campaign IN ?", params.Filter.UTMCampaign.In)
+	}
+	if len(params.Filter.UTMCampaign.NotIn) > 0 {
+		query = query.Not("utm_campaign IN ?", params.Filter.UTMCampaign.NotIn)
+	}
+
 	err = query.
 		Where("timestamp BETWEEN ? AND ?", params.Range.GTE, params.Range.LTE).
 		Find(&r).Error
@@ -112,9 +144,10 @@ func MetricGetChart(options jsonrpc.Options) (json.RawMessage, error) {
 
 	d := make(map[string]map[int]int)
 
-	if params.Total {
-		d["total"] = make(map[int]int)
-	}
+	forLimit := make(map[string]int)
+
+	res := make(map[string]map[int]int)
+	res["total"] = make(map[int]int)
 
 	// Заполнение вложенной карты
 	for _, result := range r {
@@ -137,15 +170,49 @@ func MetricGetChart(options jsonrpc.Options) (json.RawMessage, error) {
 			}
 		}
 
-		if params.Total {
-			d["total"][t*1000] += result.Total
-		}
+		res["total"][t*1000] += result.Total
+
+		forLimit[result.Dimension] += result.Total
 		d[result.Dimension][t*1000] = result.Total
 	}
 
-	result, err := json.Marshal(d)
+	topKeys := getTopNKeys(forLimit, params.Limit)
+	fmt.Println(topKeys)
+
+	for _, key := range topKeys {
+		res[key] = d[key]
+	}
+
+	result, err := json.Marshal(res)
 	if err != nil {
 		return nil, err
 	}
 	return result, nil
+}
+
+func getTopNKeys(data map[string]int, n int) []string {
+	// Создаем слайс для хранения пар (ключ, значение)
+	type kv struct {
+		Key   string
+		Value int
+	}
+	var kvList []kv
+
+	// Заполняем слайс парами (ключ, значение)
+	for k, v := range data {
+		kvList = append(kvList, kv{k, v})
+	}
+
+	// Сортируем слайс по значениям в порядке убывания
+	sort.Slice(kvList, func(i, j int) bool {
+		return kvList[i].Value > kvList[j].Value
+	})
+
+	// Создаем слайс для хранения ключей с максимальными значениями
+	var topKeys []string
+	for i := 0; i < n && i < len(kvList); i++ {
+		topKeys = append(topKeys, kvList[i].Key)
+	}
+
+	return topKeys
 }

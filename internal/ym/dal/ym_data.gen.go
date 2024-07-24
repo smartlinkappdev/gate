@@ -27,11 +27,13 @@ func newYmDatum(db *gorm.DB, opts ...gen.DOOption) ymDatum {
 
 	tableName := _ymDatum.ymDatumDo.TableName()
 	_ymDatum.ALL = field.NewAsterisk(tableName)
-	_ymDatum.ID = field.NewInt32(tableName, "id")
 	_ymDatum.Timestamp = field.NewTime(tableName, "timestamp")
 	_ymDatum.URLPath = field.NewString(tableName, "url_path")
 	_ymDatum.Browser = field.NewString(tableName, "browser")
 	_ymDatum.Device = field.NewString(tableName, "device")
+	_ymDatum.UtmSource = field.NewString(tableName, "utm_source")
+	_ymDatum.UtmMedium = field.NewString(tableName, "utm_medium")
+	_ymDatum.UtmCampaign = field.NewString(tableName, "utm_campaign")
 	_ymDatum.OperatingSystem = field.NewString(tableName, "operating_system")
 	_ymDatum.Pageviews = field.NewInt32(tableName, "pageviews")
 	_ymDatum.Users = field.NewInt32(tableName, "users")
@@ -45,11 +47,13 @@ type ymDatum struct {
 	ymDatumDo
 
 	ALL             field.Asterisk
-	ID              field.Int32
 	Timestamp       field.Time
 	URLPath         field.String
 	Browser         field.String
 	Device          field.String
+	UtmSource       field.String
+	UtmMedium       field.String
+	UtmCampaign     field.String
 	OperatingSystem field.String
 	Pageviews       field.Int32
 	Users           field.Int32
@@ -69,11 +73,13 @@ func (y ymDatum) As(alias string) *ymDatum {
 
 func (y *ymDatum) updateTableName(table string) *ymDatum {
 	y.ALL = field.NewAsterisk(table)
-	y.ID = field.NewInt32(table, "id")
 	y.Timestamp = field.NewTime(table, "timestamp")
 	y.URLPath = field.NewString(table, "url_path")
 	y.Browser = field.NewString(table, "browser")
 	y.Device = field.NewString(table, "device")
+	y.UtmSource = field.NewString(table, "utm_source")
+	y.UtmMedium = field.NewString(table, "utm_medium")
+	y.UtmCampaign = field.NewString(table, "utm_campaign")
 	y.OperatingSystem = field.NewString(table, "operating_system")
 	y.Pageviews = field.NewInt32(table, "pageviews")
 	y.Users = field.NewInt32(table, "users")
@@ -93,12 +99,14 @@ func (y *ymDatum) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (y *ymDatum) fillFieldMap() {
-	y.fieldMap = make(map[string]field.Expr, 8)
-	y.fieldMap["id"] = y.ID
+	y.fieldMap = make(map[string]field.Expr, 10)
 	y.fieldMap["timestamp"] = y.Timestamp
 	y.fieldMap["url_path"] = y.URLPath
 	y.fieldMap["browser"] = y.Browser
 	y.fieldMap["device"] = y.Device
+	y.fieldMap["utm_source"] = y.UtmSource
+	y.fieldMap["utm_medium"] = y.UtmMedium
+	y.fieldMap["utm_campaign"] = y.UtmCampaign
 	y.fieldMap["operating_system"] = y.OperatingSystem
 	y.fieldMap["pageviews"] = y.Pageviews
 	y.fieldMap["users"] = y.Users

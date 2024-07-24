@@ -2,12 +2,15 @@ package app
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"cmd/gate/main.go/internal/action"
 	"cmd/gate/main.go/internal/auth"
@@ -25,17 +28,20 @@ type App struct {
 	log *slog.Logger
 	srv *http.Server
 
-	methods map[string]jsonrpc.Method
-	conn    *gorm.DB
-	conn2   *gorm.DB
+	methods  map[string]jsonrpc.Method
+	download map[string]jsonrpc.Method
+
+	conn  *gorm.DB
+	conn2 *gorm.DB
 
 	auth auth.InterfaceAuth
 }
 
 func New(log *slog.Logger) InterfaceApp {
 	return &App{
-		log:     log,
-		methods: map[string]jsonrpc.Method{},
+		log:      log,
+		methods:  map[string]jsonrpc.Method{},
+		download: map[string]jsonrpc.Method{},
 	}
 }
 
@@ -81,6 +87,9 @@ func (app *App) Init(config *config.Config) {
 
 	app.methods["link.create.link"] = action.LinkCreateLink
 	app.methods["link.get.links"] = action.LinkGetLinks
+
+	app.download["metric.download.chart"] = action.MetricDownloadChart
+
 }
 
 func (app *App) Start() {
@@ -105,6 +114,17 @@ func (app *App) initRouter() {
 		r.Use(middleware.SetHeader("Access-Control-Allow-Methods", " GET, PUT, POST, DELETE, OPTIONS"))
 		r.Use(app.authMiddleware)
 		r.Post("/", app.handleRequest)
+		r.Options("/", func(w http.ResponseWriter, r *http.Request) {
+			fmt.Println("OPTIONS")
+			w.WriteHeader(http.StatusOK)
+		})
+	})
+
+	router.Route("/download", func(r chi.Router) {
+		r.Use(middleware.SetHeader("Access-Control-Allow-Methods", " GET, PUT, POST, DELETE, OPTIONS"))
+		r.Use(app.authMiddleware)
+		//r.Post("/", app.handleDownloadRequest)
+		r.Post("/", app.downloadCSVHandler)
 		r.Options("/", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("OPTIONS")
 			w.WriteHeader(http.StatusOK)
@@ -304,6 +324,12 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			response.Error = err.Error()
 		}
+	} else if method, ok := app.download[request.Method]; ok {
+		response.Result, err = method(options)
+		if err != nil {
+			w.WriteHeader(http.StatusOK)
+			response.Error = err.Error()
+		}
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
 		response.Error = "Method does not exist"
@@ -315,7 +341,154 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(err.Error()))
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	if request.Method == "metric.get.file" {
+		w.Header().Set("Content-Type", "application/octet-stream")
+
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(responseByteSlice)
+}
+
+func (app *App) handleDownloadRequest(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	defer func() {
+		err = r.Body.Close()
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(err.Error()))
+			return
+		}
+	}()
+
+	request := jsonrpc.Request{}
+	response := jsonrpc.Response{}
+
+	id := r.Context().Value("id").(int)
+
+	options := jsonrpc.Options{
+		Log:    app.log,
+		Conn:   app.conn,
+		Conn2:  app.conn2,
+		UserID: id,
+	}
+
+	err = json.Unmarshal(body, &request)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(err.Error()))
+		return
+	}
+
+	response.Auth = true
+	options.Params = request.Params
+
+	if method, ok := app.download[request.Method]; ok {
+		response.Result, err = method(options)
+		if err != nil {
+			w.WriteHeader(http.StatusOK)
+			response.Error = err.Error()
+		}
+	} else {
+		w.WriteHeader(http.StatusBadRequest)
+		response.Error = "Method does not exist"
+	}
+
+	responseByteSlice, err := json.Marshal(response)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(err.Error()))
+	}
+
+	if request.Method == "metric.download.chart" {
+		w.Header().Set("Content-Type", "application/octet-stream")
+
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(responseByteSlice)
+}
+
+func (app *App) downloadCSVHandler(w http.ResponseWriter, r *http.Request) {
+	// Установка заголовков ответа
+	w.Header().Set("Content-Disposition", "attachment;filename=data.csv")
+	w.Header().Set("Content-Type", "text/csv")
+
+	body, err := io.ReadAll(r.Body)
+	defer func() {
+		err = r.Body.Close()
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(err.Error()))
+			return
+		}
+	}()
+
+	request := jsonrpc.Request{}
+	response := jsonrpc.Response{}
+
+	id := r.Context().Value("id").(int)
+
+	options := jsonrpc.Options{
+		Log:    app.log,
+		Conn:   app.conn,
+		Conn2:  app.conn2,
+		UserID: id,
+	}
+
+	err = json.Unmarshal(body, &request)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(err.Error()))
+		return
+	}
+
+	response.Auth = true
+	options.Params = request.Params
+
+	if method, ok := app.download[request.Method]; ok {
+		response.Result, err = method(options)
+
+		// Создание CSV writer
+		writer := csv.NewWriter(w)
+		defer writer.Flush()
+
+		type Result struct {
+			Date      time.Time
+			Dimension string
+			PageViews int
+			Users     int
+		}
+
+		var params []Result
+		err = json.Unmarshal(response.Result, &params)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		if err := writer.Write([]string{"Date", "Dimension", "PageViews", "Users"}); err != nil {
+			http.Error(w, "Error writing record to CSV", http.StatusInternalServerError)
+			return
+		}
+
+		for _, record := range params {
+			str := []string{record.Date.Format("02.01.2006 15:04"), record.Dimension, strconv.Itoa(record.PageViews), strconv.Itoa(record.Users)}
+
+			if err := writer.Write(str); err != nil {
+				http.Error(w, "Error writing record to CSV", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		if err != nil {
+			w.WriteHeader(http.StatusOK)
+			response.Error = err.Error()
+		}
+	} else {
+		w.WriteHeader(http.StatusBadRequest)
+		response.Error = "Method does not exist"
+	}
+
 }

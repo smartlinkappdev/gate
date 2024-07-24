@@ -12,14 +12,16 @@ const TableNameYmData20240115 = "ym_data_2024_01_15"
 
 // YmData20240115 mapped from table <ym_data_2024_01_15>
 type YmData20240115 struct {
-	ID              int32     `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
 	Timestamp       time.Time `gorm:"column:timestamp;primaryKey" json:"timestamp"`
-	URLPath         string    `gorm:"column:url_path" json:"url_path"`
-	Browser         string    `gorm:"column:browser" json:"browser"`
-	Device          string    `gorm:"column:device" json:"device"`
-	OperatingSystem string    `gorm:"column:operating_system" json:"operating_system"`
-	Pageviews       int32     `gorm:"column:pageviews" json:"pageviews"`
-	Users           int32     `gorm:"column:users" json:"users"`
+	URLPath         string    `gorm:"column:url_path;primaryKey" json:"url_path"`
+	Browser         string    `gorm:"column:browser;primaryKey" json:"browser"`
+	Device          string    `gorm:"column:device;primaryKey" json:"device"`
+	UtmSource       string    `gorm:"column:utm_source;primaryKey" json:"utm_source"`
+	UtmMedium       string    `gorm:"column:utm_medium;primaryKey" json:"utm_medium"`
+	UtmCampaign     string    `gorm:"column:utm_campaign;primaryKey" json:"utm_campaign"`
+	OperatingSystem string    `gorm:"column:operating_system;primaryKey" json:"operating_system"`
+	Pageviews       int32     `gorm:"column:pageviews;not null" json:"pageviews"`
+	Users           int32     `gorm:"column:users;not null" json:"users"`
 }
 
 // TableName YmData20240115's table name

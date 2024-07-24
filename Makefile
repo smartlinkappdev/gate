@@ -10,7 +10,7 @@ recreate:
 	docker build -t gate .
 	docker tag gate akaletr/gate:latest
 	docker push akaletr/gate:latest
-	docker-compose up
+	#docker-compose up
 
 migrate:
 	go run cmd/gate/migrate.go

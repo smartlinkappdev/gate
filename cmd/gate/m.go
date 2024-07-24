@@ -1,31 +1,32 @@
 package main
 
 import (
-	"cmd/gate/main.go/internal/entity"
+	"cmd/gate/main.go/internal/dal"
 	"gorm.io/driver/postgres"
+	"gorm.io/gen"
 	"gorm.io/gorm"
 )
 
 func main() {
-	//g := gen.NewGenerator(gen.Config{
-	//	OutPath: "./internal/ym/dal",
-	//	Mode:    gen.WithoutContext | gen.WithDefaultQuery | gen.WithQueryInterface, // generate mode
-	//})
+	g := gen.NewGenerator(gen.Config{
+		OutPath: "./internal/ym/dal",
+		Mode:    gen.WithoutContext | gen.WithDefaultQuery | gen.WithQueryInterface, // generate mode
+	})
 
-	conn, _ := gorm.Open(postgres.Open("host=62.109.5.203 user=akaletr password=adelaida2011 dbname=gate port=5432"), &gorm.Config{})
+	//conn, _ := gorm.Open(postgres.Open("host=62.109.5.203 user=akaletr password=adelaida2011 dbname=gate port=5432"), &gorm.Config{})
 	//connAuth, _ := gorm.Open(postgres.Open("host=62.109.5.203 user=akaletr password=adelaida2011 dbname=auth port=5432"), &gorm.Config{})
 	//conn2, _ := gorm.Open(postgres.Open("host=45.9.27.162 user=root password=LfhTG7T7dzwmkXh dbname=sldb_dev port=5432"), &gorm.Config{})
 
-	//connYM, _ := gorm.Open(postgres.Open("host=45.9.27.162 user=root password=LfhTG7T7dzwmkXh dbname=sldb_ym port=5432"), &gorm.Config{})
+	connYM, _ := gorm.Open(postgres.Open("host=45.9.27.162 user=root password=LfhTG7T7dzwmkXh dbname=sldb_ym port=5432"), &gorm.Config{})
 
-	conn.Migrator().AutoMigrate(&entity.Link{}, entity.Group{}, entity.User{})
+	//conn2.Migrator().AutoMigrate(&entity.Link{}, entity.Group{}, entity.User{})
 
 	//
-	//dal.SetDefault(connYM)
+	dal.SetDefault(connYM)
 	//
-	//g.UseDB(connYM) // reuse your gorm db
-	//g.ApplyBasic(g.GenerateAllTable()...)
-	//g.Execute()
+	g.UseDB(connYM) // reuse your gorm db
+	g.ApplyBasic(g.GenerateAllTable()...)
+	g.Execute()
 
 	//u := query.User
 	//fmt.Println(u)
