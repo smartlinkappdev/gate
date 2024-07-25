@@ -1,8 +1,9 @@
 package entity
 
 import (
-	"gorm.io/gorm"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type Group struct {
@@ -11,9 +12,10 @@ type Group struct {
 	UpdatedAt   time.Time      `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"deleted_at"`
 	Name        string         `gorm:"size:255;not null" json:"name"`
+	Description string         `json:"description"`
+	IsPublic    bool           `json:"is_public"`
 	OwnerID     int            `json:"owner_id"`
 	Owner       *User          `gorm:"foreignKey:OwnerID"`
-	Description string         `json:"description"`
 	Users       []*User        `gorm:"many2many:user_groups;" json:"users"`
 	Links       []*Link        `gorm:"many2many:group_link;" json:"links"`
 }
