@@ -1,10 +1,12 @@
 package app
 
 import (
+	"cmd/gate/main.go/internal/action2"
 	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"gorm.io/driver/clickhouse"
 	"io"
 	"log/slog"
 	"net/http"
@@ -31,8 +33,9 @@ type App struct {
 	methods  map[string]jsonrpc.Method
 	download map[string]jsonrpc.Method
 
-	conn  *gorm.DB
-	conn2 *gorm.DB
+	conn    *gorm.DB
+	conn2   *gorm.DB
+	conn3ch *gorm.DB
 
 	auth auth.InterfaceAuth
 }
@@ -64,6 +67,24 @@ func (app *App) Init(config *config.Config) {
 	}
 	app.conn2 = conn2
 
+	host := "ch.platina360.ru"
+	port := 9443
+	username := "zosimenko%40adventum.ru"
+	password := "hi%2BRCVE%23LR9qxACE"
+	database := "sberbank"
+
+	dsn := fmt.Sprintf(
+		"https://%s:%d?username=%s&password=%s&database=%s&secure=true",
+		host, port, username, password, database,
+	)
+
+	conn3ch, err := gorm.Open(clickhouse.Open(dsn), &gorm.Config{})
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	app.conn3ch = conn3ch
+
 	app.auth = auth.New()
 	err = app.auth.Init(config.Auth.DSN)
 	if err != nil {
@@ -82,13 +103,22 @@ func (app *App) Init(config *config.Config) {
 	app.methods["group.join.group"] = action.GroupJoinGroup
 	app.methods["group.leave.group"] = action.GroupLeaveGroup
 
+	app.methods["group.invite.users"] = action.GroupInviteUsers
+	app.methods["group.add.links"] = action.GroupAddLinks
+	app.methods["group.delete.user"] = action.GroupDeleteUser
+
 	app.methods["metric.get.metric"] = action.MetricGetMetric
+	app.methods["metric.get.table"] = action.MetricGetTable
 	app.methods["metric.get.chart"] = action.MetricGetChart
 
 	app.methods["link.create.link"] = action.LinkCreateLink
 	app.methods["link.get.links"] = action.LinkGetLinks
+	app.methods["link.get.link"] = action.LinkGetLink
 
 	app.download["metric.download.chart"] = action.MetricDownloadChart
+	app.download["metric.download.bar"] = action.MetricDownloadBar
+
+	app.methods["ch.get.chart"] = action2.CHGetChart
 
 }
 
@@ -125,6 +155,7 @@ func (app *App) initRouter() {
 		r.Use(app.authMiddleware)
 		//r.Post("/", app.handleDownloadRequest)
 		r.Post("/", app.downloadCSVHandler)
+		r.Post("/bar", app.downloadCSVBarHandler)
 		r.Options("/", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("OPTIONS")
 			w.WriteHeader(http.StatusOK)
@@ -302,10 +333,11 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 	id := r.Context().Value("id").(int)
 
 	options := jsonrpc.Options{
-		Log:    app.log,
-		Conn:   app.conn,
-		Conn2:  app.conn2,
-		UserID: id,
+		Log:     app.log,
+		Conn:    app.conn,
+		Conn2:   app.conn2,
+		Conn3ch: app.conn3ch,
+		UserID:  id,
 	}
 
 	err = json.Unmarshal(body, &request)
@@ -401,7 +433,7 @@ func (app *App) handleDownloadRequest(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(err.Error()))
 	}
 
-	if request.Method == "metric.download.chart" {
+	if request.Method == "metric.download.chart" || request.Method == "metric.download.bar" {
 		w.Header().Set("Content-Type", "application/octet-stream")
 
 	} else {
@@ -475,6 +507,88 @@ func (app *App) downloadCSVHandler(w http.ResponseWriter, r *http.Request) {
 
 		for _, record := range params {
 			str := []string{record.Date.Format("02.01.2006 15:04"), record.Dimension, strconv.Itoa(record.PageViews), strconv.Itoa(record.Users)}
+
+			if err := writer.Write(str); err != nil {
+				http.Error(w, "Error writing record to CSV", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		if err != nil {
+			w.WriteHeader(http.StatusOK)
+			response.Error = err.Error()
+		}
+	} else {
+		w.WriteHeader(http.StatusBadRequest)
+		response.Error = "Method does not exist"
+	}
+
+}
+
+func (app *App) downloadCSVBarHandler(w http.ResponseWriter, r *http.Request) {
+	// Установка заголовков ответа
+	w.Header().Set("Content-Disposition", "attachment;filename=data.csv")
+	w.Header().Set("Content-Type", "text/csv")
+
+	body, err := io.ReadAll(r.Body)
+	defer func() {
+		err = r.Body.Close()
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(err.Error()))
+			return
+		}
+	}()
+
+	request := jsonrpc.Request{}
+	response := jsonrpc.Response{}
+
+	id := r.Context().Value("id").(int)
+
+	options := jsonrpc.Options{
+		Log:     app.log,
+		Conn:    app.conn,
+		Conn2:   app.conn2,
+		Conn3ch: app.conn3ch,
+		UserID:  id,
+	}
+
+	err = json.Unmarshal(body, &request)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(err.Error()))
+		return
+	}
+
+	response.Auth = true
+	options.Params = request.Params
+
+	if method, ok := app.download[request.Method]; ok {
+		response.Result, err = method(options)
+
+		// Создание CSV writer
+		writer := csv.NewWriter(w)
+		defer writer.Flush()
+
+		type Result struct {
+			Dimension string
+			PageViews int
+			Users     int
+		}
+
+		var params []Result
+		err = json.Unmarshal(response.Result, &params)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		if err := writer.Write([]string{"Dimension", "PageViews", "Users"}); err != nil {
+			http.Error(w, "Error writing record to CSV", http.StatusInternalServerError)
+			return
+		}
+
+		for _, record := range params {
+			str := []string{record.Dimension, strconv.Itoa(record.PageViews), strconv.Itoa(record.Users)}
 
 			if err := writer.Write(str); err != nil {
 				http.Error(w, "Error writing record to CSV", http.StatusInternalServerError)

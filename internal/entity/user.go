@@ -17,4 +17,5 @@ type User struct {
 	Role      string         `json:"role"`
 	Groups    []*Group       `json:"groups" gorm:"many2many:user_groups;"`
 	Links     []*Link        `json:"links" gorm:"many2many:user_link;"`
+	Presets   []*Preset      `json:"presets" gorm:"many2many:preset_users;"`
 }

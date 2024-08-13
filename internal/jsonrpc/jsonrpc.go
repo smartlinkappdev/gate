@@ -20,11 +20,12 @@ type Response struct {
 }
 
 type Options struct {
-	Log    *slog.Logger
-	Conn   *gorm.DB
-	Conn2  *gorm.DB
-	UserID int
-	Params json.RawMessage
+	Log     *slog.Logger
+	Conn    *gorm.DB
+	Conn2   *gorm.DB
+	Conn3ch *gorm.DB
+	UserID  int
+	Params  json.RawMessage
 }
 
 type Method func(options Options) (json.RawMessage, error)
