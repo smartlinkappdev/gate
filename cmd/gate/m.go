@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func main() {
+func main2() {
 	g := gen.NewGenerator(gen.Config{
 		OutPath: "./internal/ym/dal",
 		Mode:    gen.WithoutContext | gen.WithDefaultQuery | gen.WithQueryInterface, // generate mode

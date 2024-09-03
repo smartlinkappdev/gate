@@ -2,6 +2,7 @@ package jsonrpc
 
 import (
 	"encoding/json"
+	"github.com/go-redis/redis/v8"
 	"log/slog"
 
 	"gorm.io/gorm"
@@ -26,6 +27,8 @@ type Options struct {
 	Conn3ch *gorm.DB
 	UserID  int
 	Params  json.RawMessage
+	Cash    map[string]json.RawMessage
+	Rdb     *redis.Client
 }
 
 type Method func(options Options) (json.RawMessage, error)

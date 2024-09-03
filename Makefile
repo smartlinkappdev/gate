@@ -11,7 +11,12 @@ recreate:
 	docker tag gate akaletr/gate:latest
 	docker push akaletr/gate:latest
 	ssh -t root@45.9.27.162 'docker pull akaletr/gate:latest && docker stop gate && docker rm gate && docker run -p 3099:3099 --name gate -d akaletr/gate:latest'
+#	ssh -t root@62.109.5.203 'docker pull akaletr/gate:latest && docker stop gate && docker rm gate && docker run -p 3099:3099 --name gate -d akaletr/gate:latest'
 	#docker-compose up
+
+reload:
+	ssh -t root@45.9.27.162 'docker pull akaletr/gate:latest && docker stop gate && docker rm gate && docker run -p 3099:3099 --name gate -d akaletr/gate:latest'
+
 
 migrate:
 	go run cmd/gate/migrate.go

@@ -47,8 +47,9 @@ type MetricGetTableParams struct {
 			NotIn []string `json:"notIn"`
 		} `json:"utm_campaign"`
 	} `json:"filter"`
-	Limit  int `json:"limit"`
-	Offset int `json:"offset"`
+	OrderBy []map[string]string `json:"orderBy"`
+	Limit   int                 `json:"limit"`
+	Offset  int                 `json:"offset"`
 }
 
 func MetricGetTable(options jsonrpc.Options) (json.RawMessage, error) {
@@ -64,7 +65,7 @@ func MetricGetTable(options jsonrpc.Options) (json.RawMessage, error) {
 	m := model.YmDatum{}
 
 	type Result struct {
-		Date            string `json:"date,omitempty"`
+		ID              int    `json:"id,omitempty" gorm:"id"`
 		Day             string `json:"day,omitempty" gorm:"day"`
 		Hour            string `json:"hour,omitempty"`
 		Browser         string `json:"browser,omitempty"`
@@ -96,16 +97,18 @@ func MetricGetTable(options jsonrpc.Options) (json.RawMessage, error) {
 	for _, str := range params.Dimensions {
 		if str == "day" {
 			dimensionStrings = append(dimensionStrings, "TO_CHAR(timestamp, 'YYYY-MM-DD') as day")
-			//groupStrings = append(groupStrings, "TO_CHAR(timestamp, 'YYYY-MM-DD')")
+			groupStrings = append(groupStrings, "TO_CHAR(timestamp, 'YYYY-MM-DD')")
 
 		} else if str == "hour" {
 			dimensionStrings = append(dimensionStrings, "TO_CHAR(timestamp, 'HH24:00') as hour")
-			//groupStrings = append(groupStrings, "TO_CHAR(timestamp, 'HH24:00')")
+			groupStrings = append(groupStrings, "TO_CHAR(timestamp, 'HH24:00')")
+		} else if str == "id" {
+			dimensionStrings = append(dimensionStrings, "row_number() OVER () as id")
 		} else {
 			dimensionStrings = append(dimensionStrings, str)
-			//groupStrings = append(groupStrings, str)
 			groupStrings = append(groupStrings, str)
 		}
+		//groupStrings = append(groupStrings, str)
 
 	}
 
@@ -113,7 +116,7 @@ func MetricGetTable(options jsonrpc.Options) (json.RawMessage, error) {
 
 	// Начало формирования запроса
 	//query := options.Conn2.Model(&m).Select(queryParams).Group(strings.Join(dimensionStrings, ", "))
-	query := options.Conn2.Model(&m).Select(queryParams).Group(fmt.Sprintf("timestamp, %s", strings.Join(groupStrings, ", ")))
+	query := options.Conn2.Model(&m).Select(queryParams).Group(fmt.Sprintf("%s", strings.Join(groupStrings, ", ")))
 	queryTotal := options.Conn2.Model(&m).Select(fmt.Sprintf(finalString))
 
 	if len(params.Filter.URLPath.In) > 0 {
@@ -179,7 +182,14 @@ func MetricGetTable(options jsonrpc.Options) (json.RawMessage, error) {
 		queryTotal = queryTotal.Not("utm_campaign IN ?", params.Filter.UTMCampaign.NotIn)
 	}
 
+	type Totals struct {
+		Rows      int `gorm:"rows" json:"rows,omitempty"`
+		Users     int `json:"users,omitempty"`
+		Pageviews int `json:"pageviews,omitempty"`
+	}
+
 	var totalRows int64
+
 	err = query.
 		Where("timestamp BETWEEN ? AND ?", params.Range.GTE, params.Range.LTE).
 		Count(&totalRows).Error
@@ -187,19 +197,22 @@ func MetricGetTable(options jsonrpc.Options) (json.RawMessage, error) {
 		fmt.Println("Error counting rows:", err)
 	}
 
+	if params.Limit != 0 {
+		query = query.Limit(params.Limit)
+	}
+
+	for _, order := range params.OrderBy {
+		for key, value := range order {
+			query = query.Order(fmt.Sprintf("%s %s", key, value))
+		}
+	}
+
 	err = query.
 		Where("timestamp BETWEEN ? AND ?", params.Range.GTE, params.Range.LTE).
-		Limit(params.Limit).
 		Offset(params.Offset).
 		Find(&r).Error
 	if err != nil {
 		fmt.Println(err)
-	}
-
-	type Totals struct {
-		Rows      int `gorm:"rows" json:"rows,omitempty"`
-		Users     int `json:"users,omitempty"`
-		Pageviews int `json:"pageviews,omitempty"`
 	}
 
 	type Res struct {

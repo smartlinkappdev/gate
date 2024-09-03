@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"github.com/go-redis/redis/v8"
 	"gorm.io/driver/clickhouse"
 	"io"
 	"log/slog"
@@ -38,6 +39,8 @@ type App struct {
 	conn3ch *gorm.DB
 
 	auth auth.InterfaceAuth
+	cash map[string]json.RawMessage
+	rdb  *redis.Client
 }
 
 func New(log *slog.Logger) InterfaceApp {
@@ -57,24 +60,34 @@ func (app *App) Init(config *config.Config) {
 
 	conn, err := gorm.Open(postgres.Open(config.Storage.DSN), &gorm.Config{})
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		//panic(err)
 	}
 	app.conn = conn
 
-	conn2, err := gorm.Open(postgres.Open("host=45.9.27.162 user=root password=LfhTG7T7dzwmkXh dbname=sldb_ym port=5432"), &gorm.Config{})
+	conn2, err := gorm.Open(postgres.Open(config.Conn2DSN), &gorm.Config{})
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		//panic(err)
 	}
 	app.conn2 = conn2
 
-	host := "ch.platina360.ru"
-	port := 9443
-	username := "zosimenko%40adventum.ru"
-	password := "hi%2BRCVE%23LR9qxACE"
-	database := "sberbank"
+	host := config.CHHost
+	port := config.CHPort
+	username := config.CHUsername
+	password := config.CHPassword
+	database := config.CHDatabase
+
+	app.cash = map[string]json.RawMessage{}
+
+	app.rdb = redis.NewClient(&redis.Options{
+		Addr:     "45.9.27.162:3097", // адрес Redis-сервера
+		Password: "",                 // пароль, если у вас настроена аутентификация
+		DB:       0,                  // номер базы данных, по умолчанию используется 0
+	})
 
 	dsn := fmt.Sprintf(
-		"https://%s:%d?username=%s&password=%s&database=%s&secure=true",
+		"https://%s:%s?username=%s&password=%s&database=%s&secure=true&verify=false&InsecureSkipVerify=true",
 		host, port, username, password, database,
 	)
 
@@ -89,6 +102,8 @@ func (app *App) Init(config *config.Config) {
 	err = app.auth.Init(config.Auth.DSN)
 	if err != nil {
 		app.log.Error("Failed to init auth", "err", err)
+		fmt.Println(err)
+
 		panic(err)
 	}
 
@@ -119,6 +134,8 @@ func (app *App) Init(config *config.Config) {
 	app.download["metric.download.bar"] = action.MetricDownloadBar
 
 	app.methods["ch.get.chart"] = action2.CHGetChart
+	app.methods["ch.get.meta"] = action2.CHGetMeta
+	app.methods["ch.get.table"] = action2.CHGetTable
 
 }
 
@@ -338,6 +355,8 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		Conn2:   app.conn2,
 		Conn3ch: app.conn3ch,
 		UserID:  id,
+		Cash:    app.cash,
+		Rdb:     app.rdb,
 	}
 
 	err = json.Unmarshal(body, &request)

@@ -16,10 +16,13 @@ COPY . .
 # Build the Go binary
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /main cmd/gate/main.go
 
-# Stage 2: Create the final lightweight image
-FROM scratch
+# Stage 2: Create the final lightweight image with Alpine
+FROM alpine:3.18
 
-# Copy the binary from the builder stage
+# Install CA certificates
+RUN apk add --no-cache ca-certificates
+
+# Copy the binary and environment file from the builder stage
 COPY --from=builder /main /main
 COPY --from=builder /app/.env /.env
 

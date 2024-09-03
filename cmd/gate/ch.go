@@ -12,7 +12,7 @@ import (
 	"gorm.io/gen"
 )
 
-func main() {
+func main1() {
 	g := gen.NewGenerator(gen.Config{
 		OutPath: "./internal/sl/dal",
 		Mode:    gen.WithoutContext | gen.WithDefaultQuery | gen.WithQueryInterface, // generate mode
@@ -56,7 +56,7 @@ func main() {
 	dal.SetDefault(db)
 
 	g.UseDB(db) // reuse your gorm db
-	g.ApplyBasic(g.GenerateModel("smartlink"))
+	g.ApplyBasic(g.GenerateModel("dmik_agg_marketing"))
 	g.Execute()
 
 }

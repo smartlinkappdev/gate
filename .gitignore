@@ -1,0 +1,3 @@
+cmd/gate/migrate.go
+cmd/gate/ch.go
+cmd/gate/m.go

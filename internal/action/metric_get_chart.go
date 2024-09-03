@@ -77,9 +77,6 @@ func MetricGetChart(options jsonrpc.Options) (json.RawMessage, error) {
 		dateString = "EXTRACT(EPOCH FROM timestamp)"
 	}
 
-	//paths := make([]string, 0)
-	//options.Conn.Model(entity.User{ID: options.UserID}).Select("name").Association("Links").Find(&paths)
-
 	queryParams := make([]string, 0)
 	queryParams = append(queryParams, fmt.Sprintf("%s as date", dateString), fmt.Sprintf("%s as dimension", params.Dimension), fmt.Sprintf("sum(%s) as total", params.Metric))
 
